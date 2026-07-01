@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>在庫撮影</title>
+<style>
+  :root{
+    --ink:#16150f; --panel:#1f1d16; --line:#34312a;
+    --paper:#f6f4ef; --brass:#c8973f; --brass-d:#a87c2b;
+    --muted:#8a8578; --good:#3aa06a; --bad:#d05757; --req:#e0b257;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+    background:var(--paper);color:var(--ink);font-size:15px;line-height:1.5;
+    padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);
+  }
+  .wrap{max-width:640px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 16px;background:var(--ink);color:#efe9da;position:sticky;top:0;z-index:10;
+  }
+  header b{font-size:15px;letter-spacing:.04em}
+  header .sub{font-size:11px;color:#9b9588}
+  .icon-btn{background:none;border:none;color:#cfc9bb;font-size:20px;cursor:pointer;padding:6px}
+  main{flex:1;padding:16px}
+
+  /* ボタン */
+  .btn{display:block;width:100%;padding:14px;border-radius:12px;font-size:15px;font-weight:700;
+    border:1px solid var(--brass-d);background:var(--brass);color:#16150f;cursor:pointer;margin-top:12px}
+  .btn:active{filter:brightness(.95)}
+  .btn.sec{background:#fff;color:var(--ink);border-color:#cfc8b8}
+  .btn.dark{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .btn:disabled{opacity:.5}
+
+  label{display:block;font-size:12px;font-weight:700;color:#5a564a;margin:14px 0 5px}
+  input{width:100%;padding:13px;border:1px solid #cfc8b8;border-radius:10px;font-size:15px;background:#fff}
+  input:focus{outline:none;border-color:var(--brass)}
+  .card{background:#fff;border:1px solid #e3ded3;border-radius:14px;padding:16px;margin-bottom:12px}
+  .hint{font-size:12px;color:var(--muted);margin-top:8px}
+  .err{color:var(--bad);font-size:13px;margin-top:10px;font-weight:600}
+
+  /* リスト */
+  .item{display:flex;align-items:center;gap:12px;padding:14px;background:#fff;border:1px solid #e3ded3;
+    border-radius:12px;margin-bottom:10px;cursor:pointer}
+  .item:active{background:#fbf8f0}
+  .item.junk{background:#e6e4dd;border-color:#d3cfc4;color:#8f8a7d}
+  .item.junk .thumb{background:#d8d4c9;color:#9a9484}
+  .item .thumb{width:46px;height:46px;border-radius:10px;background:#efeadf;display:flex;align-items:center;
+    justify-content:center;font-size:18px;color:#b3ab98;flex-shrink:0}
+  .item .meta{flex:1;min-width:0}
+  .item .meta b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .item .meta span{font-size:12px;color:var(--muted)}
+  .tag{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px}
+  .tag.wait{background:#fbf1d8;color:#a9791f}
+  .tag.done{background:#e3f2e9;color:var(--good)}
+  .empty{text-align:center;color:var(--muted);padding:50px 20px}
+  .modebar{display:flex;gap:8px;margin-bottom:14px}
+  .mbtn{flex:1;padding:11px;border-radius:10px;border:1px solid #cfc8b8;background:#fff;font-weight:700;font-size:14px;color:var(--ink)}
+  .mbtn.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .navbar{display:flex;gap:8px;margin-bottom:14px}
+  .nbtn{flex:1;padding:13px;border-radius:10px;border:1px solid #cfc8b8;background:#fff;font-weight:700;font-size:15px;color:var(--ink)}
+  .nbtn.on{background:var(--brass);color:#fff;border-color:var(--brass)}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .pno{width:40px;height:40px;border-radius:9px;background:#f0ece1;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:var(--ink);flex:0 0 auto}
+  .pitem{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e7e1d4;border-radius:12px;margin-bottom:8px;background:#fff}
+  .pitem .m{flex:1;min-width:0}
+  .pitem .m b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pitem .m span{font-size:12px;color:var(--muted)}
+  .mini{padding:9px 11px;border-radius:8px;border:1px solid #cfc8b8;background:#fff;font-weight:700;font-size:13px;color:var(--ink);flex:0 0 auto}
+  .mini.del{color:#b23b3b;border-color:#e3b4b4}
+  .hint2{font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5}
+  .urow{border:1px solid #e7e1d4;border-radius:12px;padding:10px 12px;margin-bottom:8px;background:#fff}
+  .uhead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .ulabel{font-weight:700;font-size:14px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ubtn{flex:0 0 auto;padding:9px 12px;border-radius:8px;border:1px solid var(--brass);background:#fff;color:var(--brass);font-weight:700;font-size:13px;cursor:pointer}
+  .ustrip{display:flex;gap:8px;overflow-x:auto;margin-top:10px;padding-bottom:2px}
+  .ushot{position:relative;flex:0 0 auto}
+  .ushot img{width:76px;height:76px;object-fit:cover;border-radius:8px;display:block}
+  .ushot .rm{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:none;background:#b23b3b;color:#fff;font-size:12px;line-height:1;cursor:pointer}
+
+  /* 撮影画面 */
+  .cam-wrap{position:relative;background:#000;border-radius:14px;overflow:hidden;aspect-ratio:3/4}
+  video,canvas.cap{width:100%;height:100%;object-fit:cover;display:block}
+  .overlay{position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between}
+  .guide-label{margin:12px;align-self:center;background:#000000aa;color:#fff;padding:7px 16px;border-radius:30px;
+    font-size:14px;font-weight:700;backdrop-filter:blur(2px)}
+  .guide-frame{position:absolute;inset:14% 12%;border:2px dashed #ffffff80;border-radius:10px}
+  .req-dot{color:var(--req)}
+  .shutter-row{display:flex;align-items:center;justify-content:space-between;padding:14px 8px 4px}
+  .shutter{width:68px;height:68px;border-radius:50%;background:#fff;border:5px solid var(--brass);cursor:pointer}
+  .shutter:active{transform:scale(.94)}
+  .zoombar{display:flex;align-items:center;gap:10px;padding:10px 6px 0}
+  .zoombar input[type=range]{flex:1;accent-color:var(--brass);height:26px}
+  .zbtn{padding:8px 10px;border-radius:8px;border:1px solid #cfc8b8;background:#fff;font-weight:700;font-size:13px;color:var(--ink);white-space:nowrap}
+  .zlab{min-width:46px;text-align:right;font-weight:700;font-size:13px;color:var(--ink)}
+  .mini{font-size:12px;color:var(--muted);text-align:center}
+
+  /* アングルチップ */
+  .angles{display:flex;gap:8px;overflow-x:auto;padding:4px 0 8px;-webkit-overflow-scrolling:touch}
+  .chip{flex-shrink:0;padding:8px 13px;border-radius:20px;border:1px solid #cfc8b8;background:#fff;
+    font-size:12.5px;white-space:nowrap;cursor:pointer;position:relative}
+  .chip.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .chip.has{border-color:var(--good)}
+  .chip .cnt{color:var(--good);font-weight:700;margin-left:4px}
+  .chip.active .cnt{color:#7fdca6}
+
+  /* 撮影済みストリップ */
+  .strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:8px;margin-top:12px}
+  .shot{position:relative;border-radius:10px;overflow:hidden;aspect-ratio:1}
+  .shot img{width:100%;height:100%;object-fit:cover;display:block}
+  .shot .ang{position:absolute;left:0;right:0;bottom:0;background:#000000bb;color:#fff;font-size:9px;padding:2px 4px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .shot .rm{position:absolute;top:2px;right:2px;background:#000000cc;color:#fff;border:none;border-radius:50%;
+    width:20px;height:20px;font-size:12px;cursor:pointer;line-height:1}
+
+  /* 進捗・トースト */
+  .progress{height:6px;background:#e3ded3;border-radius:6px;overflow:hidden;margin:12px 0}
+  .progress > div{height:100%;background:var(--brass);width:0;transition:.2s}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;
+    padding:12px 22px;border-radius:30px;font-size:14px;z-index:50;opacity:0;transition:.25s;max-width:90%}
+  .toast.show{opacity:1}
+  .toast.err{background:var(--bad)}
+  .toast.ok{background:var(--good)}
+  /* アップロード中ロック */
+  .busy{position:fixed;inset:0;background:#0f0e0bdd;z-index:200;display:none;align-items:center;justify-content:center;padding:24px}
+  .busy.show{display:flex}
+  .ub-card{background:#fff;border-radius:16px;padding:26px 28px;width:300px;max-width:90%;text-align:center;box-shadow:0 20px 50px #00000050}
+  .ub-label{font-weight:700;font-size:15px;margin-bottom:14px;color:var(--ink)}
+  .ub-bar{height:10px;background:#e9e4d8;border-radius:8px;overflow:hidden}
+  .ub-bar>div{height:100%;width:0;background:linear-gradient(90deg,var(--brass),#d8b163);transition:width .25s}
+  .ub-pct{font-size:22px;font-weight:700;margin-top:12px;color:var(--ink)}
+  .ub-note{font-size:12px;color:var(--muted);margin-top:4px}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <b id="hTitle">在庫撮影</b>
+      <div class="sub" id="hSub">出品用 写真撮影アプリ</div>
+    </div>
+    <button class="icon-btn" id="gearBtn" onclick="showSetup()" title="設定">⚙</button>
+  </header>
+  <main id="main"></main>
+</div>
+<div class="toast" id="toast"></div>
+
+<div class="busy" id="upBusy">
+  <div class="ub-card">
+    <div class="ub-label">アップロード中…</div>
+    <div class="ub-bar"><div></div></div>
+    <div class="ub-pct">0%</div>
+    <div class="ub-note">完了するまで画面を閉じないでください</div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   在庫撮影アプリ（GitHub Pages 静的サイト）
+   管理画面(GAS)の doPost API に接続して動作します。
+   ============================================================ */
+const LS_URL='inv_gas_url', LS_TOKEN='inv_gas_token';
+let CONFIG={ url:localStorage.getItem(LS_URL)||'', token:localStorage.getItem(LS_TOKEN)||'' };
+let CURRENT=null;          // 撮影中の商品
+let STAGED=[];             // [{angle, dataUrl}] アップロード待ち
+let ACTIVE_ANGLE=0;        // 選択中アングルindex
+let stream=null;
+let MODE=localStorage.getItem('inv_mode')||'listing';  // listing=出品用 / intake=仕入れ・作業用
+// 仕入れ・作業用の画角（すべて任意）
+const INTAKE_ANGLES=[
+  {name:'メイン（正面）',required:false},
+  {name:'裏',required:false},
+  {name:'全体',required:false},
+  {name:'電池',required:false},
+  {name:'付属品',required:false},
+  {name:'キズ・難',required:false},
+  {name:'シリアル・型番',required:false},
+  {name:'リューズ・操作部',required:false},
+  {name:'ムーブメント',required:false},
+  {name:'動作の様子',required:false},
+  {name:'仕入時メモ用',required:false}
+];
+
+const $=s=>document.querySelector(s);
+const main=()=>$('#main');
+function toast(msg,type){
+  const t=$('#toast'); t.textContent=msg; t.className='toast show '+(type||'');
+  setTimeout(()=>t.className='toast',2600);
+}
+
+/* ---- API（text/plain で送ってCORSプリフライト回避）---- */
+async function api(action,payload){
+  if(!CONFIG.url||!CONFIG.token) throw new Error('未設定です。歯車から接続情報を入力してください。');
+  const body=Object.assign({token:CONFIG.token,action:action},payload||{});
+  let res;
+  try{
+    res=await fetch(CONFIG.url,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify(body),
+      redirect:'follow'
+    });
+  }catch(e){ throw new Error('通信に失敗しました。URL/ネットワーク/デプロイ権限（全員）を確認してください。'); }
+  const text=await res.text();
+  let json;
+  try{ json=JSON.parse(text); }
+  catch(e){ throw new Error('応答が不正です。GASのデプロイを「アクセス＝全員」で公開し、/exec のURLを使ってください。'); }
+  if(!json.ok) throw new Error(json.error||'サーバーエラー');
+  return json.data;
+}
+
+/* ============================================================
+   画面：接続設定
+   ============================================================ */
+function showSetup(){
+  if(typeof UP_BUSY!=='undefined'&&UP_BUSY) return;
+  stopCamera();
+  $('#hTitle').textContent='接続設定'; $('#hSub').textContent='管理画面(GAS)と連携';
+  main().innerHTML=`
+    <div class="card">
+      <label>GAS ウェブアプリ URL（…/exec）</label>
+      <input id="cf_url" placeholder="https://script.google.com/macros/s/XXXX/exec" value="${CONFIG.url||''}">
+      <label>連携トークン</label>
+      <input id="cf_token" placeholder="管理画面の設定に表示されるトークン" value="${CONFIG.token||''}">
+      <div class="hint">トークンは管理画面の「設定 → スマホ撮影アプリ連携」に表示されます。
+        GAS側は「デプロイ → アクセスできるユーザー＝全員」で公開してください。</div>
+      <div class="err hidden" id="cf_err"></div>
+      <button class="btn" id="cf_save" onclick="saveSetup()">接続テストして保存</button>
+    </div>`;
+}
+async function saveSetup(){
+  const url=$('#cf_url').value.trim(), token=$('#cf_token').value.trim();
+  const err=$('#cf_err'); err.classList.add('hidden');
+  if(!url||!token){ err.textContent='URLとトークンを入力してください'; err.classList.remove('hidden'); return; }
+  $('#cf_save').disabled=true; $('#cf_save').textContent='接続中…';
+  CONFIG={url,token};
+  try{
+    await api('listPendingItems');
+    localStorage.setItem(LS_URL,url); localStorage.setItem(LS_TOKEN,token);
+    toast('接続しました','ok'); showList();
+  }catch(e){
+    err.textContent=e.message; err.classList.remove('hidden');
+    $('#cf_save').disabled=false; $('#cf_save').textContent='接続テストして保存';
+  }
+}
+
+/* ============================================================
+   画面：撮影待ちリスト
+   ============================================================ */
+async function showList(){
+  stopCamera();
+  $('#hTitle').textContent='撮影する商品';
+  $('#hSub').textContent=(MODE==='intake'?'仕入れ・作業用モード':'出品用モード');
+  main().innerHTML='<div class="empty">読み込み中…</div>';
+  let data;
+  try{ data=await api('listPendingItems'); }
+  catch(e){ main().innerHTML=`<div class="card"><div class="err">${e.message}</div>
+    <button class="btn sec" onclick="showSetup()">接続設定を開く</button></div>`; return; }
+  const items=data.items||[];
+  const toggle=navbar('cap')+`<div class="modebar">
+    <button class="mbtn ${MODE==='listing'?'on':''}" onclick="setMode('listing')">出品用</button>
+    <button class="mbtn ${MODE==='intake'?'on':''}" onclick="setMode('intake')">仕入れ・作業用</button>
+  </div>`;
+  if(!items.length){ main().innerHTML=toggle+'<div class="empty">対象の商品がありません。<br>管理画面で仕入れを登録してください。</div>'; return; }
+  // 通し番号の昇順
+  items.sort((a,b)=>(Number(a.no)||99999)-(Number(b.no)||99999));
+  LIST_ITEMS=items;
+  main().innerHTML=toggle+`<button class="btn sec" onclick="showList()" style="margin:0 0 14px">↻ 再読み込み</button>`+
+    items.map((it,idx)=>{
+      const gray=(it.status==='ジャンク'||it.status==='低価値')?' junk':'';
+      return `<div class="item${gray}" onclick="startCapture(LIST_ITEMS[${idx}])">
+        <div class="thumb">${it.no?('#'+esc(it.no)):(it.category==='フィルムカメラ'?'📷':'⌚')}</div>
+        <div class="meta"><b>${esc(it.brand)} ${esc(it.model)}</b>
+          <span>${esc(it.category)}${it.ref?'・Ref '+esc(it.ref):''}・${esc(it.status||'')}</span></div>
+        <button class="mini" onclick="event.stopPropagation();showUpload(LIST_ITEMS[${idx}])" title="ファイルから">📁</button>
+      </div>`;
+    }).join('');
+}
+let LIST_ITEMS=[];
+function setMode(m){ if(typeof UP_BUSY!=='undefined'&&UP_BUSY) return; MODE=m; localStorage.setItem('inv_mode',m); showList(); }
+
+/* ============================================================
+   画面：ファイルからアップロード（1画面・全画角任意）
+   ============================================================ */
+async function showUpload(item){
+  if(typeof UP_BUSY!=='undefined'&&UP_BUSY) return;
+  stopCamera();
+  CURRENT=item; STAGED=[];
+  CURRENT._listingAngles = (item.angles&&item.angles.length)?item.angles:[{name:'写真',required:false}];
+  applyUploadAngles();
+  $('#hTitle').textContent='ファイルからアップロード';
+  $('#hSub').textContent=`${item.no?'#'+item.no+' ':''}${item.brand} ${item.model}`;
+  renderUpload();
+}
+function applyUploadAngles(){
+  const base=(MODE==='intake')?INTAKE_ANGLES:CURRENT._listingAngles;
+  CURRENT.angles=base.map(a=>({name:a.name,required:false})); // アップローダは全て任意
+}
+function uSetMode(m){ if(typeof UP_BUSY!=='undefined'&&UP_BUSY) return; MODE=m; localStorage.setItem('inv_mode',m); STAGED=[]; applyUploadAngles(); renderUpload(); }
+function renderUpload(){
+  const angles=CURRENT.angles;
+  const rows=angles.map((a,i)=>{
+    const order=i+1;
+    const shots=STAGED.map((s,gi)=>({s,gi})).filter(o=>o.s.order===order);
+    const thumbs=shots.map(o=>`<div class="ushot"><img src="${o.s.dataUrl}"><button class="rm" onclick="uRemove(${o.gi})">✕</button></div>`).join('');
+    return `<div class="urow">
+      <div class="uhead">
+        <div class="ulabel">${esc(String(order))}. ${esc(a.name)}</div>
+        <label class="ubtn">＋写真を選ぶ<input type="file" accept="image/*" multiple class="hidden" onchange="uPick(event,${order})"></label>
+      </div>
+      ${thumbs?`<div class="ustrip">${thumbs}</div>`:''}
+    </div>`;
+  }).join('');
+  main().innerHTML=navbar('cap')+`
+    <button class="btn sec" onclick="showList()" style="margin:0 0 12px">← 撮影リストへ</button>
+    <div class="modebar">
+      <button class="mbtn ${MODE==='listing'?'on':''}" onclick="uSetMode('listing')">出品用</button>
+      <button class="mbtn ${MODE==='intake'?'on':''}" onclick="uSetMode('intake')">仕入れ・作業用</button>
+    </div>
+    <div class="hint2">画角ごとに端末内の写真を選べます（すべて任意・複数可）。保存時にファイル名を「連番_画角」に自動変更します。</div>
+    ${rows}
+    <button class="btn" id="upBtn" onclick="uploadAll()" style="margin-top:14px">アップロード（0枚）</button>`;
+  updateUpCount();
+}
+async function uPick(e, order){
+  const files=[...e.target.files]; e.target.value='';
+  if(!files.length) return;
+  const angle=CURRENT.angles[order-1] ? CURRENT.angles[order-1].name : ('photo'+order);
+  for(const f of files){
+    const raw=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(f);});
+    const data=await downscale(raw);
+    STAGED.push({angle, dataUrl:data, order});
+  }
+  renderUpload();
+  toast(files.length+'枚を追加','ok');
+}
+function uRemove(i){ STAGED.splice(i,1); renderUpload(); }
+function updateUpCount(){ const b=$('#upBtn'); if(b) b.textContent=`アップロード（${STAGED.length}枚）`; }
+
+/* ============================================================
+   画面：仕入れ管理（スマホから 新規/編集/追加/削除）
+   ============================================================ */
+function navbar(active){
+  return `<div class="navbar">
+    <button class="nbtn ${active==='cap'?'on':''}" onclick="showList()">📷 撮影</button>
+    <button class="nbtn ${active==='pur'?'on':''}" onclick="showPurchases()">📦 仕入れ管理</button>
+  </div>`;
+}
+function selOpts(opts,cur){ return opts.map(o=>`<option ${String(o)===String(cur||'')?'selected':''}>${o}</option>`).join(''); }
+let PUR=null, PUR_ITEMS=[], EDIT_ITEM=null;
+
+async function showPurchases(){
+  if(typeof UP_BUSY!=='undefined'&&UP_BUSY) return;
+  stopCamera();
+  $('#hTitle').textContent='仕入れ管理'; $('#hSub').textContent='タップで編集／新規登録';
+  main().innerHTML=navbar('pur')+'<div class="empty">読み込み中…</div>';
+  let rows;
+  try{ rows=await api('listPurchases'); }
+  catch(e){ main().innerHTML=navbar('pur')+`<div class="card"><div class="err">${e.message}</div>
+    <button class="btn sec" onclick="showSetup()">接続設定を開く</button></div>`; return; }
+  const list=(rows||[]).map(p=>`
+    <div class="item" onclick="showPurchaseEdit('${esc(p['仕入ID'])}')">
+      <div class="pno">${p['No開始']?('#'+esc(p['No開始'])):'仕'}</div>
+      <div class="meta"><b>${esc(p['仕入日']||'日付未設定')}　${esc(p['仕入種別']||'')}</b>
+        <span>${esc(p['仕入元']||'')}・${p['点数']||0}点・${esc(p['仕入ID'])}</span></div>
+      <span class="tag">¥${Number(p['商品代金合計']||0).toLocaleString()}</span>
+    </div>`).join('');
+  main().innerHTML=navbar('pur')+
+    `<button class="btn" onclick="newPurchase()" style="margin:0 0 14px">＋ 新規仕入れを登録</button>`+
+    (list||'<div class="empty">仕入れがありません。<br>「＋ 新規仕入れ」から登録してください。</div>');
+}
+async function newPurchase(){
+  if(typeof UP_BUSY!=='undefined'&&UP_BUSY) return;
+  const today=new Date().toISOString().slice(0,10);
+  try{
+    const r=await api('createPurchase',{purchase:{'仕入種別':'まとめ','仕入元':'ヤフオク','仕入日':today,'商品代金合計':0,'送料':0,'手数料':0,'その他費用':0,'仕入先名':'','備考':''}});
+    toast('新規仕入れを作成しました','ok');
+    showPurchaseEdit(r.pid);
+  }catch(e){ toast(e.message,'err'); }
+}
+async function showPurchaseEdit(pid){
+  if(typeof UP_BUSY!=='undefined'&&UP_BUSY) return;
+  stopCamera();
+  $('#hTitle').textContent='仕入れ編集'; $('#hSub').textContent=pid;
+  main().innerHTML=navbar('pur')+'<div class="empty">読み込み中…</div>';
+  let data;
+  try{ data=await api('getPurchase',{pid}); }
+  catch(e){ main().innerHTML=navbar('pur')+`<div class="card"><div class="err">${e.message}</div></div>`; return; }
+  PUR=data.purchase||null; PUR_ITEMS=data.items||[];
+  if(!PUR){ toast('見つかりません','err'); showPurchases(); return; }
+  renderPurchaseEdit();
+}
+function renderPurchaseEdit(){
+  const p=PUR;
+  const items=PUR_ITEMS.map(it=>`
+    <div class="pitem">
+      <div class="pno">${it['通し番号']?('#'+esc(it['通し番号'])):'＊'}</div>
+      <div class="m"><b>${esc(it['ブランド']||'(無名)')} ${esc(it['モデル名']||'')}</b>
+        <span>${esc(it['リファレンス番号']||'')}${it['まとめ売り']==='対象'?'・まとめ売り':''}・¥${Number(it['合計原価']||0).toLocaleString()}</span></div>
+      <button class="mini" onclick="showItemEdit('${esc(it['商品ID'])}')">編集</button>
+      <button class="mini del" onclick="delPurItem('${esc(it['商品ID'])}')">🗑</button>
+    </div>`).join('');
+  main().innerHTML=navbar('pur')+`
+    <button class="btn sec" onclick="showPurchases()" style="margin:0 0 12px">← 仕入れ一覧へ</button>
+    <div class="card">
+      <label>仕入種別</label><select id="p_type">${selOpts(['まとめ','個々'],p['仕入種別'])}</select>
+      <label>仕入元</label><select id="p_src">${selOpts(['ヤフオク','個人','古物市場','その他'],p['仕入元'])}</select>
+      <label>仕入日</label><input type="date" id="p_date" value="${esc(p['仕入日']||'')}">
+      <div class="g2">
+        <div><label>商品代金合計</label><input type="number" id="p_total" value="${esc(p['商品代金合計']||0)}"></div>
+        <div><label>送料</label><input type="number" id="p_ship" value="${esc(p['送料']||0)}"></div>
+      </div>
+      <div class="g2">
+        <div><label>手数料</label><input type="number" id="p_fee" value="${esc(p['手数料']||0)}"></div>
+        <div><label>その他費用</label><input type="number" id="p_other" value="${esc(p['その他費用']||0)}"></div>
+      </div>
+      <label>仕入先名</label><input id="p_supplier" value="${esc(p['仕入先名']||'')}">
+      <label>按分方法</label><select id="p_method">${selOpts(['均等割','想定販売価格比率','手動指定'],p['按分方法']||'均等割')}</select>
+      <label>備考</label><input id="p_memo" value="${esc(p['備考']||'')}">
+      <button class="btn" onclick="savePurchase()">保存して原価を再計算</button>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:6px 2px 10px">
+      <b>商品（${PUR_ITEMS.length}点）</b>
+      <button class="mini" onclick="addPurItem()">＋ 商品を追加</button>
+    </div>
+    ${items||'<div class="empty">商品がありません。「＋ 商品を追加」で追加してください。</div>'}`;
+}
+async function savePurchase(){
+  const patch={'仕入種別':$('#p_type').value,'仕入元':$('#p_src').value,'仕入日':$('#p_date').value,
+    '商品代金合計':$('#p_total').value,'送料':$('#p_ship').value,'手数料':$('#p_fee').value,
+    'その他費用':$('#p_other').value,'仕入先名':$('#p_supplier').value,'備考':$('#p_memo').value};
+  try{ await api('updatePurchase',{pid:PUR['仕入ID'],patch,method:$('#p_method').value}); toast('保存しました','ok'); showPurchaseEdit(PUR['仕入ID']); }
+  catch(e){ toast(e.message,'err'); }
+}
+async function addPurItem(){
+  try{
+    await api('addItem',{pid:PUR['仕入ID'],item:{'カテゴリ':'腕時計'}});
+    await api('finalizePurchase',{pid:PUR['仕入ID'],method:($('#p_method')?$('#p_method').value:PUR['按分方法'])});
+    toast('商品を追加しました','ok'); showPurchaseEdit(PUR['仕入ID']);
+  }catch(e){ toast(e.message,'err'); }
+}
+async function delPurItem(id){
+  if(!confirm('この商品を削除しますか？\n写真フォルダもゴミ箱へ移動します。')) return;
+  try{ await api('deleteItem',{id}); await api('finalizePurchase',{pid:PUR['仕入ID'],method:PUR['按分方法']}); toast('削除しました','ok'); showPurchaseEdit(PUR['仕入ID']); }
+  catch(e){ toast(e.message,'err'); }
+}
+function showItemEdit(id){
+  if(typeof UP_BUSY!=='undefined'&&UP_BUSY) return;
+  EDIT_ITEM=PUR_ITEMS.find(x=>x['商品ID']===id); if(!EDIT_ITEM){ toast('見つかりません','err'); return; }
+  const it=EDIT_ITEM;
+  $('#hTitle').textContent='商品編集'; $('#hSub').textContent=(it['通し番号']?'#'+it['通し番号']+' ':'')+id;
+  main().innerHTML=navbar('pur')+`
+    <button class="btn sec" onclick="showPurchaseEdit('${esc(PUR['仕入ID'])}')" style="margin:0 0 12px">← 仕入れ編集へ</button>
+    <div class="card">
+      <label>ブランド（メーカー）</label><input id="i_brand" value="${esc(it['ブランド']||'')}">
+      <label>モデル名</label><input id="i_model" value="${esc(it['モデル名']||'')}">
+      <label>リファレンス番号</label><input id="i_ref" value="${esc(it['リファレンス番号']||'')}">
+      <label>性別</label><select id="i_gender">${selOpts(['','メンズ','レディース','ユニセックス'],it['性別'])}</select>
+      <label>状態</label><input id="i_state" value="${esc(it['状態']||'')}">
+      <div class="g2">
+        <div><label>想定売値USD</label><input type="number" id="i_usd" value="${esc(it['想定売値USD']||0)}"></div>
+        <div><label>追加費用(円)</label><input type="number" id="i_extra" value="${esc(it['追加費用']||0)}"></div>
+      </div>
+      <label>まとめ売り（ほぼ価値なし＝按分から除外し0円）</label>
+      <select id="i_bulk">${selOpts(['','対象'],it['まとめ売り'])}</select>
+      <button class="btn" onclick="saveItem('${esc(id)}')">保存</button>
+    </div>`;
+}
+async function saveItem(id){
+  const patch={'ブランド':$('#i_brand').value,'モデル名':$('#i_model').value,'リファレンス番号':$('#i_ref').value,
+    '性別':$('#i_gender').value,'状態':$('#i_state').value,'想定売値USD':$('#i_usd').value,'追加費用':$('#i_extra').value,'まとめ売り':$('#i_bulk').value};
+  try{
+    await api('updateItem',{id,patch});
+    await api('finalizePurchase',{pid:PUR['仕入ID'],method:PUR['按分方法']}); // 原価を再計算
+    toast('保存しました','ok'); showPurchaseEdit(PUR['仕入ID']);
+  }catch(e){ toast(e.message,'err'); }
+}
+
+/* ============================================================
+   画面：撮影
+   ============================================================ */
+function startCapture(item){
+  if(typeof UP_BUSY!=='undefined'&&UP_BUSY) return;
+  CURRENT=item; STAGED=[]; ACTIVE_ANGLE=0;
+  // モードで画角セットを切替（仕入れ・作業用は専用・すべて任意）
+  CURRENT.angles = (MODE==='intake') ? INTAKE_ANGLES.slice()
+    : (item.angles && item.angles.length ? item.angles : [{name:'写真',required:false}]);
+  $('#hTitle').textContent=(MODE==='intake'?'仕入れ・作業用 撮影':'出品用 撮影');
+  $('#hSub').textContent=`${item.no?'#'+item.no+' ':''}${item.brand} ${item.model}`;
+  main().innerHTML=`
+    <button class="btn sec" onclick="confirmBack()" style="margin:0 0 12px">← リストに戻る</button>
+    <div class="angles" id="angles"></div>
+    <div class="cam-wrap" id="camWrap">
+      <video id="video" playsinline autoplay muted></video>
+      <div class="overlay">
+        <div class="guide-label" id="guideLabel"></div>
+        <div class="guide-frame"></div>
+      </div>
+    </div>
+    <div class="zoombar" id="zoomBar">
+      <button class="zbtn" onclick="nudgeZoom(-1)">引き −</button>
+      <input type="range" id="zoomRange" min="1" max="5" step="0.1" value="1" oninput="onZoom(this.value)">
+      <button class="zbtn" onclick="nudgeZoom(1)">＋ 寄り</button>
+      <span class="zlab" id="zoomLab">1.0x</span>
+    </div>
+    <div class="shutter-row">
+      <button class="icon-btn" style="font-size:13px" onclick="fileFallback()">🖼 ファイル</button>
+      <div class="shutter" onclick="snap()"></div>
+      <button class="icon-btn" style="font-size:13px" onclick="flipCamera()">🔄 切替</button>
+    </div>
+    <div class="mini" id="camMini">必須 <span class="req-dot">●</span> のアングルを撮影してください</div>
+    <input type="file" id="fileInput" accept="image/*" capture="environment" class="hidden" onchange="onFile(event)">
+    <div class="strip" id="strip"></div>
+    <div class="progress hidden" id="prog"><div></div></div>
+    <button class="btn" id="upBtn" onclick="uploadAll()">アップロード（0枚）</button>`;
+  renderAngles(); renderStrip(); startCamera();
+}
+
+let facing='environment';
+let ZOOM=1, ZMIN=1, ZMAX=5, ZSTEP=0.1, ZCAP=false; // ZCAP=trueでハードウェアズーム
+async function startCamera(){
+  stopCamera();
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facing}},audio:false});
+    const v=$('#video'); if(v){ v.srcObject=stream; v.style.transform=''; }
+    // ズーム能力の検出
+    ZCAP=false; ZMIN=1; ZMAX=5; ZSTEP=0.1; ZOOM=1;
+    try{
+      const track=stream.getVideoTracks()[0];
+      const caps=track.getCapabilities?track.getCapabilities():{};
+      if(caps&&caps.zoom){ ZCAP=true; ZMIN=caps.zoom.min||1; ZMAX=caps.zoom.max||(ZMIN*4); ZSTEP=caps.zoom.step||0.1; }
+    }catch(e){}
+    const r=$('#zoomRange'); if(r){ r.min=ZMIN; r.max=ZMAX; r.step=ZSTEP||0.1; r.value=ZMIN; }
+    setZoom(ZMIN);
+  }catch(e){
+    $('#camMini').innerHTML='カメラを起動できませんでした。「🖼 ファイル」から撮影してください。';
+  }
+}
+function setZoom(z){
+  z=Math.max(ZMIN,Math.min(ZMAX,Number(z)||ZMIN)); ZOOM=z;
+  const r=$('#zoomRange'); if(r) r.value=z;
+  const lab=$('#zoomLab'); if(lab) lab.textContent=(z/ZMIN).toFixed(1)+'x';
+  const v=$('#video');
+  if(ZCAP){
+    const track=stream&&stream.getVideoTracks()[0];
+    if(track){ try{ track.applyConstraints({advanced:[{zoom:z}]}); }catch(e){} }
+    if(v) v.style.transform='';
+  }else if(v){
+    v.style.transform='scale('+z+')'; v.style.transformOrigin='center center';
+  }
+}
+function onZoom(v){ setZoom(v); }
+function nudgeZoom(dir){ setZoom(ZOOM + dir*((ZMAX-ZMIN)/10 || 0.2)); }
+function stopCamera(){ if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } }
+function flipCamera(){ facing=(facing==='environment')?'user':'environment'; startCamera(); }
+
+function renderAngles(){
+  const cont=$('#angles'); if(!cont) return;
+  cont.innerHTML=CURRENT.angles.map((a,i)=>{
+    const cnt=STAGED.filter(s=>s.angle===a.name).length;
+    return `<div class="chip ${i===ACTIVE_ANGLE?'active':''} ${cnt?'has':''}" onclick="selectAngle(${i})">
+      ${a.required?'<span class="req-dot">●</span> ':''}${esc(a.name)}${cnt?`<span class="cnt">${cnt}</span>`:''}</div>`;
+  }).join('');
+  const a=CURRENT.angles[ACTIVE_ANGLE];
+  $('#guideLabel').innerHTML=(a.required?'<span class="req-dot">●</span> ':'')+esc(a.name);
+  // アクティブchipを表示域に
+  const el=cont.children[ACTIVE_ANGLE]; if(el) el.scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'});
+}
+function selectAngle(i){ ACTIVE_ANGLE=i; renderAngles(); }
+
+/* 撮影（ライブ映像→キャンバス→縮小JPEG） */
+async function snap(){
+  if(UP_BUSY) return;
+  const v=$('#video');
+  if(!v||!v.videoWidth){ toast('カメラ準備中です',''); return; }
+  const c=document.createElement('canvas');
+  const ctx=c.getContext('2d');
+  if(!ZCAP && ZOOM>1){
+    // デジタルズーム：プレビューと同じく中央を切り出して撮影
+    const sw=v.videoWidth/ZOOM, sh=v.videoHeight/ZOOM;
+    const sx=(v.videoWidth-sw)/2, sy=(v.videoHeight-sh)/2;
+    c.width=sw; c.height=sh;
+    ctx.drawImage(v, sx,sy,sw,sh, 0,0,sw,sh);
+  }else{
+    c.width=v.videoWidth; c.height=v.videoHeight;
+    ctx.drawImage(v,0,0);
+  }
+  const data=await downscale(c.toDataURL('image/jpeg',0.92));
+  addShot(data);
+}
+/* ファイル/ネイティブカメラ フォールバック */
+function fileFallback(){ $('#fileInput').click(); }
+async function onFile(e){
+  const f=e.target.files[0]; if(!f) return;
+  const raw=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(f);});
+  addShot(await downscale(raw));
+  e.target.value='';
+}
+function addShot(dataUrl){
+  const angle=CURRENT.angles[ACTIVE_ANGLE].name;
+  STAGED.push({angle,dataUrl,order:ACTIVE_ANGLE+1});
+  // 次の画角へ順番に進む（最後の画角ならそのまま）
+  if(ACTIVE_ANGLE < CURRENT.angles.length-1) ACTIVE_ANGLE++;
+  renderAngles(); renderStrip();
+  // 撮影後に映像が一時停止する端末対策：再生し直す
+  const v=$('#video'); if(v&&v.paused){ v.play().catch(()=>{}); }
+  toast('撮影しました','ok');
+}
+function renderStrip(){
+  $('#strip').innerHTML=STAGED.map((s,i)=>`
+    <div class="shot"><img src="${s.dataUrl}">
+      <button class="rm" onclick="rmShot(${i})">✕</button>
+      <div class="ang">${esc(s.angle)}</div></div>`).join('');
+  const btn=$('#upBtn');
+  btn.textContent=`アップロード（${STAGED.length}枚）`;
+  btn.disabled=STAGED.length===0;
+}
+function rmShot(i){ STAGED.splice(i,1); renderStrip(); renderAngles(); }
+
+/* 画像縮小 */
+/* 画像を軽量化：長辺は最大1600px（eBay推奨。最低500px要件も満たす）、
+   目標サイズ(約500KB)以下になるまでJPEG品質を自動で下げる */
+function dataUrlBytes(u){ const i=u.indexOf(','); return i<0?0:Math.floor((u.length-i-1)*3/4); }
+function downscale(dataUrl,maxDim=1600,quality=0.85){
+  const TARGET=500*1024;
+  return new Promise(res=>{
+    const img=new Image();
+    img.onload=()=>{
+      let w=img.width,h=img.height;
+      if(Math.max(w,h)>maxDim){ const r=maxDim/Math.max(w,h); w=Math.round(w*r); h=Math.round(h*r); }
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      let q=quality, out=c.toDataURL('image/jpeg',q);
+      while(dataUrlBytes(out)>TARGET && q>0.55){ q-=0.08; out=c.toDataURL('image/jpeg',q); }
+      res(out);
+    };
+    img.src=dataUrl;
+  });
+}
+
+/* アップロード（2枚ずつ分割送信・全画面ロック＋進捗％）*/
+let UP_BUSY=false;
+function setUpBusy(on,pct,label){
+  UP_BUSY=on; const o=document.getElementById('upBusy'); if(!o) return;
+  if(on){
+    o.classList.add('show');
+    o.querySelector('.ub-pct').textContent=Math.round(pct)+'%';
+    o.querySelector('.ub-bar>div').style.width=Math.max(0,Math.min(100,pct))+'%';
+    if(label)o.querySelector('.ub-label').textContent=label;
+  } else o.classList.remove('show');
+}
+async function uploadAll(){
+  if(UP_BUSY) return;
+  if(!STAGED.length) return;
+  const req=CURRENT.angles.filter(a=>a.required);
+  const missing=req.filter(a=>!STAGED.some(s=>s.angle===a.name));
+  if(missing.length){
+    if(!confirm(`必須アングルが${missing.length}件未撮影です。\n（${missing.map(a=>a.name).join('、')}）\nこのままアップロードしますか？`)) return;
+  }
+  const chunks=[]; for(let i=0;i<STAGED.length;i+=2) chunks.push(STAGED.slice(i,i+2));
+  const sessionAngles=Array.from(new Set(STAGED.map(s=>s.angle)));  // 今回撮った画角（同一画角は置き換え）
+  let done=0;
+  setUpBusy(true,0,'アップロード中…');
+  try{
+    for(let ci=0;ci<chunks.length;ci++){
+      const ch=chunks[ci];
+      const payload={itemId:CURRENT.id,photos:ch,purpose:(MODE==='intake'?'intake':'listing')};
+      if(ci===0) payload.replaceAngles=sessionAngles;   // 最初の送信でのみ旧データを置き換え
+      await api('uploadPhotos',payload);
+      done+=ch.length;
+      setUpBusy(true, done/STAGED.length*100, `アップロード中… ${done}/${STAGED.length}枚`);
+    }
+    setUpBusy(true,100,'完了しました');
+    await new Promise(r=>setTimeout(r,500));
+    setUpBusy(false);
+    toast(`${done}枚アップロードしました`,'ok');
+    stopCamera(); showList();
+  }catch(e){
+    setUpBusy(false);
+    toast('アップロード失敗：'+e.message,'err');
+  }
+}
+
+function confirmBack(){
+  if(UP_BUSY) return;
+  if(STAGED.length && !confirm('未アップロードの写真があります。破棄して戻りますか？')) return;
+  stopCamera(); showList();
+}
+
+/* util */
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ---- 起動 ---- */
+if(CONFIG.url && CONFIG.token) showList(); else showSetup();
+window.addEventListener('pagehide',stopCamera);
+</script>
+</body>
+</html>
